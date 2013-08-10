@@ -7,10 +7,11 @@ from urllib import *
 import tkFileDialog
 
 #got this from wikipedia
-raw_data="""18   MP4 	360p 	H.264 	Baseline 	0.5 	AAC 	96
+raw_data="""
+18   MP4 	360p 	H.264 	Baseline 0.5    AAC     96
 34 	FLV 	360p 	H.264 	Main 	0.5 	AAC 	128
 43 	WebM 	360p 	VP8 	N/A 	0.5 	Vorbis 	128
-82 	MP4 	360p 	H.264 	3D 	0.5 	AAC 	96
+82 	MP4 	360p 	H.264 	3D 	0.5 	    AAC 	96
 101 	WebM 	360p 	VP8 	3D 	N/A 	Vorbis 	192
 100 	WebM 	360p 	VP8 	3D 	N/A 	Vorbis 	128
 5 	FLV 	240p 	Sorenson H.263 	N/A 	0.25 	MP3 	64
@@ -22,13 +23,13 @@ raw_data="""18   MP4 	360p 	H.264 	Baseline 	0.5 	AAC 	96
 36 	3GP 	240p 	MPEG-4 Visual 	Simple 	0.17 	AAC 	38
 37 	MP4 	1080p 	H.264 	High 	3-4.3 	AAC 	152
 38 	MP4 	3072p 	H.264 	High 	3.5-5 	AAC 	152
-44 	WebM 	480p 	VP8 	N/A 	1 	Vorbis 	128
-45 	WebM 	720p 	VP8 	N/A 	2 	Vorbis 	192
+84     MP4 	720p 	H.264 	3D 	2-2.9    	AAC 	152
+85 	MP4 	520p 	H.264 	3D 	2-2.9   	AAC 	152
+44 	WebM 	480p 	VP8 	N/A 	1     	Vorbis 	128
+45 	WebM 	720p 	VP8 	N/A 	2 	    Vorbis 	192
 46 	WebM 	1080p 	VP8 	N/A 	N/A 	Vorbis 	192
-83 	MP4 	240p 	H.264 	3D 	0.5 	AAC 	96
-84 	MP4 	720p 	H.264 	3D 	2-2.9 	AAC 	152
-85 	MP4 	520p 	H.264 	3D 	2-2.9 	AAC 	152
-102 	WebM 	720p 	VP8 	3D 	N/A 	Vorbis 	192
+102 WebM 	720p 	VP8 	3D 	N/A     	Vorbis 	192
+83 	MP4 	240p 	H.264 	3D 	0.5     	AAC 	96
 """.splitlines()
 
 format_dict ={}
