@@ -1,113 +1,119 @@
-__author__ = "mehdi alouane"
-__lisence__ = "GNU General Public License ,Versio 2.0"
-__GPL__ = "http://opensource.org/licenses/GPL-2.0"
-import re
-from urlparse import *
-from urllib import *
-import tkFileDialog
+#!/usr/bin/env python
+# youtube-dl-playlist
+# 
+# Utility to download Youtube playlist videos.
+# 
+# @author Mehdi Alouane <pro4medo@gmail.com>
+# @license LGPL version 2 or greater <http://www.gnu.org/licenses/lgpl.html>
 
-#got this from wikipedia
-raw_data="""
-18   MP4 	360p 	H.264 	Baseline 0.5    AAC     96
-34 	FLV 	360p 	H.264 	Main 	0.5 	AAC 	128
-43 	WebM 	360p 	VP8 	N/A 	0.5 	Vorbis 	128
-82 	MP4 	360p 	H.264 	3D 	0.5 	    AAC 	96
-101 	WebM 	360p 	VP8 	3D 	N/A 	Vorbis 	192
-100 	WebM 	360p 	VP8 	3D 	N/A 	Vorbis 	128
-5 	FLV 	240p 	Sorenson H.263 	N/A 	0.25 	MP3 	64
-6 	FLV 	270p 	Sorenson H.263 	N/A 	0.8 	MP3 	64
-13 	3GP 	N/A 	MPEG-4 Visual 	N/A 	0.5 	AAC 	N/A
-17 	3GP 	144p 	MPEG-4 Visual 	Simple 	0.05 	AAC 	24
-22 	MP4 	720p 	H.264 	High 	2-2.9 	AAC 	152
-35 	FLV 	480p 	H.264 	Main 	0.8-1 	AAC 	128
-36 	3GP 	240p 	MPEG-4 Visual 	Simple 	0.17 	AAC 	38
-37 	MP4 	1080p 	H.264 	High 	3-4.3 	AAC 	152
-38 	MP4 	3072p 	H.264 	High 	3.5-5 	AAC 	152
-84     MP4 	720p 	H.264 	3D 	2-2.9    	AAC 	152
-85 	MP4 	520p 	H.264 	3D 	2-2.9   	AAC 	152
-44 	WebM 	480p 	VP8 	N/A 	1     	Vorbis 	128
-45 	WebM 	720p 	VP8 	N/A 	2 	    Vorbis 	192
-46 	WebM 	1080p 	VP8 	N/A 	N/A 	Vorbis 	192
-102 WebM 	720p 	VP8 	3D 	N/A     	Vorbis 	192
-83 	MP4 	240p 	H.264 	3D 	0.5     	AAC 	96
-""".splitlines()
+import sys
+import urllib
+import httplib
+import json
+import os
+import shutil
+import tempfile
+import glob
 
-format_dict ={}
 
-for lines in raw_data:
-    l = lines.split()
-    fmt = l.pop(0)
-    format_dict[fmt] = l
+class PlaylistDownloader:
+    targetDir = ''
+    totalVideos = 0
+    downloaded = 0
 
-#returns the downloadable video link of a video in all available formats. original source code from
-#http://stackoverflow.com/questions/2678051/cant-download-youtube-video (the second last comment)
-#modified it myself though
-def yt_url(video_url):
-    video_id = parse_qs(urlparse(video_url).query)['v'][0]
-    get_vars = parse_qs(unquote(urlopen("http://www.youtube.com/get_video_info?video_id="+video_id).read()))
-    newdict = {}
-    for urls in get_vars['itag']:
+    def setTarget(self, target):
+        self.targetDir = os.path.realpath(target) + '/';
+        return self.targetDir;
+
+    def download(self, playlistId):
+        print 'Getting playlist information ... '
+        data = self.fetchInfo(playlistId)
+        self.totalVideos = int(data['feed']['openSearch$totalResults']['$t'])
+        print 'Total videos to download: ' + str(self.totalVideos)
+
+        playlistDir = self.createPath(self.targetDir, data['feed']['title']['$t']);
+        os.chdir(self.setTarget(playlistDir))
+
+        self.downloaded = 1;
+        while(self.downloaded <= self.totalVideos):
+            data = self.fetchInfo(playlistId, self.downloaded, 50)
+            self.downloadEntires(data['feed']['entry'])
+
+    def downloadEntires(self, entries):
+        for entry in entries:
+            group = entry['media$group'];
+            if self.downloadEntry(group['yt$videoid']['$t'], group['media$title']['$t']):
+                self.downloaded = self.downloaded + 1
+            print
+
+    def downloadEntry(self, ytId, ytTitle):
+        print ytId + '(' + str(self.downloaded).zfill(3) + '):', ytTitle, '...'
+
+        existing = glob.glob('*' + ytId + '.*');
+        filtered = [x for x in existing if not x.endswith('part')]
+        if filtered.__len__() > 0:
+            print 'alreary exists, skipping...'
+            return True
+
         try:
-            (fmt,link) =urls.split(',')
-            link = link[4:]
-            newdict[fmt] = link
-        except:
-            break
-    return newdict
+            os.system('youtube-dl -t --audio-format=best http://www.youtube.com/watch?v=' + ytId)
+            return True
 
-#given a playlist id, return the links of all videos
-def get_all_videos_in_playlist(ID):
-    playlist_url ="http://www.youtube.com/playlist?list="+ID
-    html_content = urlopen(playlist_url).read()
-    urls = re.findall(r'/watch.+&amp;list='+str(ID)+r'&amp;index=[0-9]+&amp;feature=plpp_video',html_content)
-    newurls = ["http://www.youtube.com"+urlitem for urlitem in urls]
-    return newurls
+        except KeyboardInterrupt:
+            sys.exit(1)
+        
+        except Exception as e:
+            print 'failed: ', e.strerror
+            return False
+
+    def fetchInfo(self, playlistId, start = 1, limit = 0):
+        connection = httplib.HTTPConnection('gdata.youtube.com')
+        connection.request('GET', '/feeds/api/playlists/' + str(playlistId) + '/?' + urllib.urlencode({
+                'alt' : 'json',
+                'max-results' : limit,
+                'start-index' : start,
+                'v' : 2
+            }))
+
+        response = connection.getresponse()
+        if response.status != 200:
+            print 'Error: Not a valid/public playlist.'
+            sys.exit(1)
+
+        data = response.read()
+        data = json.loads(data)
+        return data
+
+    def createPath(self, path, title):
+        title = title.replace('/', '')
+        number = ''
+
+        if os.path.exists(path + title) == True and os.path.isdir(path + title) == False:
+            while(os.path.exists(path + title + str(number)) == True and os.path.isdir(path + title + str(number)) == False):
+                if number == '':
+                    number = 0
+
+                number = number + 1
+
+        if os.path.exists(path + title + str(number)) == False:
+            os.mkdir(path + title + str(number))
+
+        return path + title + str(number)
 
 
-ID = raw_input("Enter the playlist id ")
-print "Retrieving videos from the list. Please wait.."
-videos = get_all_videos_in_playlist(ID)
-print len(videos), " videos retrieved from the playlist"
-print "Now generating the download url"
-i = 1
 
-formatlist = []
-downloadlink_by_index = {}
-
-for urls in videos:
-    print "Generating download link for url ", i
-    dictionary = yt_url(urls)
-    for items in dictionary:
-        if items not in formatlist:
-            formatlist.append(items)
-        downloadlink_by_index[i] = dictionary
-    i+=1
-
-print
-print "All dowload links generated. Printing information..."
-print "There are a total of ", len(formatlist), " formats available"
-for formats in formatlist:
-    format_info = format_dict[formats]
-    format_string = format_info[0] +'/' + format_info[1] +'/'+format_info[6] +'/'
-    print formats, "  ", format_string
-
-wantedformat = raw_input("Enter formatnumber eg. \"f1 f2 f3\" (without quotes). Video will be stored in f1 if available, else in f2 and so on").split()
-for formats in formatlist:
-    if formats not in wantedformat:
-        wantedformat.append(formats)
-
-downloadlinks = ""
-for index in range(1,len(videos)+1):
-    dictionary = downloadlink_by_index[index]
-    #now determine the most nice available format
-    for formats in wantedformat:
-        if formats in dictionary:
-            #save to file
-            downloadlinks += dictionary[formats] + '\n'
-            break
-
-savefilename = tkFileDialog.asksaveasfilename(filetypes=[('text files','.txt')], initialfile='links.txt', title='Save download links')
-file = open(savefilename,"w")
-file.write(downloadlinks)
-file.close
-print "Done!!\nThanks for using this script!! So long!"
+if __name__ == '__main__':
+    if len(sys.argv) < 2:
+        print 'Usage: youtube-dl-playlist PLAYLIST_ID [DESTINATION_PATH]'
+        sys.exit(1)
+    else:
+        if sys.argv[1][0] == 'P' and sys.argv[1][1] == 'L':
+            PLAYLIST_ID = sys.argv[1][2:]
+        else:
+            PLAYLIST_ID = sys.argv[1]
+    downloader = PlaylistDownloader()
+    if len(sys.argv) == 3:
+        downloader.setTarget(sys.argv[2] + '/')
+    else:
+        downloader.setTarget('./')
+    downloader.download(PLAYLIST_ID);
